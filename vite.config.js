@@ -1,4 +1,9 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({ plugins: [vue()], base: './' })
+
+export default defineConfig({
+  plugins: [vue()],
+  base: '/MyTakken/'  // 将 './' 修改为 '/仓库名/'
+})
+
