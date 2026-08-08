@@ -1,105 +1,283 @@
 <template>
-  <div class="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-10">
-    <header class="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-20">
-      <div class="max-w-md mx-auto flex justify-between items-center">
-        <div>
-          <h1 class="text-xl font-bold tracking-wide">宅建 2026 速记卡</h1>
-          <p class="text-xs text-indigo-200 mt-0.5">重难点: {{ starredCount }} / {{ cards.length }}</p>
-        </div>
-        <button @click="showOnlyStarred = !showOnlyStarred" :class="['px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1', showOnlyStarred ? 'bg-amber-400 text-slate-900' : 'bg-indigo-500 text-white']">
-          <span>★ 错题/重点</span>
-          <span class="bg-indigo-900/30 px-1.5 py-0.5 rounded-full text-[10px]">{{ starredCount }}</span>
-        </button>
+  <div class="app-container">
+    <header class="header">
+      <h1 class="title">2026 宅建士 核心考点通关卡</h1>
+      <div class="stats-box">
+        掌握进度：{{ stats.mastered }} / {{ stats.total }}（{{ stats.percent }}%） 
+        | 需复习: {{ stats.review }} | 未刷: {{ stats.unlearned }}
       </div>
     </header>
-    <main class="max-w-md mx-auto w-full px-4 mt-4 flex-1 flex flex-col gap-4">
-      <section class="flex flex-col gap-2">
-        <input v-model="searchQuery" type="text" placeholder="搜索考点（如：35条、代理）..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"/>
-        <div class="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <button v-for="cat in categories" :key="cat" @click="selectedCategory = cat" :class="['px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors font-medium', selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200']">{{ cat }}</button>
-        </div>
-      </section>
-      <section v-if="filteredCards.length > 0" class="flex-1 flex flex-col justify-center items-center py-2">
-        <div class="w-full aspect-[4/5] perspective-1000 relative cursor-pointer" @click="isFlipped = !isFlipped">
-          <div :class="['w-full h-full duration-500 transform-style-3d transition-transform relative rounded-2xl shadow-lg', isFlipped ? 'rotate-y-180' : '']">
-            <div class="absolute inset-0 bg-white rounded-2xl p-6 flex flex-col justify-between backface-hidden border border-slate-100">
-              <div class="flex justify-between items-center">
-                <span class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-md text-xs font-bold">{{ currentCard.category }}</span>
-                <button @click.stop="toggleStar(currentCard.id)" class="text-2xl transition-transform active:scale-125">
-                  <span :class="currentCard.isStarred ? 'text-amber-400' : 'text-slate-300'">★</span>
-                </button>
-              </div>
-              <div class="my-auto text-center">
-                <h3 class="text-lg font-bold text-slate-800 leading-snug mb-2">{{ currentCard.title }}</h3>
-                <p class="text-sm text-slate-600">{{ currentCard.question }}</p>
-              </div>
-              <div class="text-center text-xs text-slate-400 font-medium">点击卡片翻面看解析 🔄</div>
-            </div>
-            <div class="absolute inset-0 bg-slate-900 text-white rounded-2xl p-6 flex flex-col justify-between backface-hidden rotate-y-180 border border-slate-800">
-              <div class="flex justify-between items-center">
-                <span class="px-2.5 py-1 bg-indigo-500/20 text-indigo-300 rounded-md text-xs font-semibold">【解答/要点】</span>
-                <span class="text-xs text-slate-400">#{{ currentCard.id }}</span>
-              </div>
-              <div class="my-auto">
-                <p class="text-base font-medium leading-relaxed text-slate-100">{{ currentCard.answer }}</p>
-                <div v-if="currentCard.tags" class="flex flex-wrap gap-1 mt-4">
-                  <span v-for="tag in currentCard.tags" :key="tag" class="text-[10px] bg-slate-800 text-indigo-300 px-2 py-0.5 rounded">#{{ tag }}</span>
-                </div>
-              </div>
-              <div class="text-center text-xs text-slate-500">点击卡片返回正面</div>
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center justify-between w-full mt-6 px-2">
-          <button @click="prevCard" :disabled="currentIndex === 0" class="px-4 py-2 bg-white text-slate-700 rounded-xl shadow-sm border border-slate-200 disabled:opacity-40 text-sm font-medium">← 上一题</button>
-          <span class="text-xs font-semibold text-slate-500">{{ currentIndex + 1 }} / {{ filteredCards.length }}</span>
-          <button @click="nextCard" :disabled="currentIndex === filteredCards.length - 1" class="px-4 py-2 bg-indigo-600 text-white rounded-xl shadow-sm disabled:opacity-40 text-sm font-medium">下一题 →</button>
-        </div>
-      </section>
-      <div v-else class="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 py-12">
-        <p class="text-sm">没有匹配到相关的考点内容。</p>
-        <button @click="resetFilters" class="text-xs text-indigo-600 underline">重置筛选条件</button>
+
+    <!-- 科目分类 Tab -->
+    <div class="tab-group">
+      <button 
+        v-for="tab in tabs" 
+        :key="tab.key" 
+        :class="['tab-btn', { active: category === tab.key }]"
+        @click="category = tab.key"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <!-- 卡片区域 -->
+    <div v-if="currentCard" class="card-wrapper">
+      <div class="card-meta">
+        <span class="category-tag">[{{ currentCard.category }}] {{ currentCard.title }}</span>
+        <span class="counter">{{ currentIndex + 1 }} / {{ filteredQuestions.length }}</span>
       </div>
-    </main>
+
+      <div class="card" @click="isFlipped = !isFlipped">
+        <div class="question-text">{{ currentCard.question }}</div>
+        
+        <div v-if="isFlipped" class="answer-box">
+          <div class="answer-title">【核心解析 / 正确答案】</div>
+          <div class="answer-text">{{ currentCard.answer }}</div>
+        </div>
+        <div v-else class="flip-hint">
+          💡 点击卡片查看答案与解析
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="action-grid">
+        <button :disabled="currentIndex === 0" @click="prevCard">上一题</button>
+        <button class="btn-review" @click="markStatus(1)">⚠️ 标记模糊</button>
+        <button class="btn-master" @click="markStatus(2)">✅ 标记掌握</button>
+        <button :disabled="currentIndex === filteredQuestions.length - 1" @click="nextCard">下一题</button>
+      </div>
+    </div>
+
+    <div v-else class="empty-state">
+      🎉 当前分类下暂无题库卡片
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { takkenData } from './data/takkenData.js'
+import { ref, computed, watch, onMounted } from 'vue';
+import { getQuestionsByCategory, getUserProgress, saveCardStatus } from './utils/dataLoader';
 
-const categories = ["全部", "宅建業法", "権利関係", "法令上の制限", "税・その他"]
-const selectedCategory = ref("全部")
-const searchQuery = ref("")
-const showOnlyStarred = ref(false)
-const isFlipped = ref(false)
-const currentIndex = ref(0)
-const cards = ref([])
+const category = ref('all');
+const currentIndex = ref(0);
+const isFlipped = ref(false);
+const progress = ref({});
+
+const tabs = [
+  { key: 'all', label: '全部' },
+  { key: 'gyohou', label: '宅建業法' },
+  { key: 'kenri', label: '権利関係' },
+  { key: 'hourei', label: '法令上の制限' },
+  { key: 'zeitsu', label: '税・その他' }
+];
 
 onMounted(() => {
-  const savedStars = JSON.parse(localStorage.getItem('takken_stars') || '[]')
-  cards.value = takkenData.map(card => ({ ...card, isStarred: savedStars.includes(card.id) }))
-})
+  progress.value = getUserProgress();
+});
 
-const filteredCards = computed(() => cards.value.filter(card => {
-  const matchCat = selectedCategory.value === "全部" || card.category === selectedCategory.value
-  const matchSearch = card.title.includes(searchQuery.value) || card.question.includes(searchQuery.value) || card.answer.includes(searchQuery.value)
-  const matchStar = !showOnlyStarred.value || card.isStarred
-  return matchCat && matchSearch && matchStar
-}))
+const rawQuestions = computed(() => {
+  return getQuestionsByCategory(category.value);
+});
 
-const currentCard = computed(() => filteredCards.value[currentIndex.value] || {})
-const starredCount = computed(() => cards.value.filter(c => c.isStarred).length)
+const filteredQuestions = computed(() => rawQuestions.value);
 
-const nextCard = () => { if (currentIndex.value < filteredCards.value.length - 1) { isFlipped.value = false; currentIndex.value++; } }
-const prevCard = () => { if (currentIndex.value > 0) { isFlipped.value = false; currentIndex.value--; } }
-const toggleStar = (id) => {
-  const card = cards.value.find(c => c.id === id)
-  if (card) {
-    card.isStarred = !card.isStarred
-    localStorage.setItem('takken_stars', JSON.stringify(cards.value.filter(c => c.isStarred).map(c => c.id)))
+const currentCard = computed(() => filteredQuestions.value[currentIndex.value] || null);
+
+const stats = computed(() => {
+  const total = rawQuestions.value.length;
+  let mastered = 0, review = 0, unlearned = 0;
+  rawQuestions.value.forEach(q => {
+    const st = progress.value[q.id] || 0;
+    if (st === 2) mastered++;
+    else if (st === 1) review++;
+    else unlearned++;
+  });
+  return {
+    total,
+    mastered,
+    review,
+    unlearned,
+    percent: total ? Math.round((mastered / total) * 100) : 0
+  };
+});
+
+watch(category, () => {
+  currentIndex.value = 0;
+  isFlipped.value = false;
+});
+
+const markStatus = (status) => {
+  if (!currentCard.value) return;
+  saveCardStatus(currentCard.value.id, status);
+  progress.value = getUserProgress();
+  isFlipped.value = false;
+  if (currentIndex.value < filteredQuestions.value.length - 1) {
+    currentIndex.value++;
   }
-}
-const resetFilters = () => { selectedCategory.value = "全部"; searchQuery.value = ""; showOnlyStarred.value = false; }
-watch([selectedCategory, searchQuery, showOnlyStarred], () => { currentIndex.value = 0; isFlipped.value = false; })
+};
+
+const nextCard = () => {
+  if (currentIndex.value < filteredQuestions.value.length - 1) {
+    currentIndex.value++;
+    isFlipped.value = false;
+  }
+};
+
+const prevCard = () => {
+  if (currentIndex.value > 0) {
+    currentIndex.value--;
+    isFlipped.value = false;
+  }
+};
 </script>
+
+<style scoped>
+.app-container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 20px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1f2937;
+}
+
+.header {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.title {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.stats-box {
+  background: #f3f4f6;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.tab-group {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.category-tag {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  min-height: 220px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.question-text {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.answer-box {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #d1d5db;
+}
+
+.answer-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #059669;
+  margin-bottom: 4px;
+}
+
+.answer-text {
+  font-size: 14px;
+  color: #064e3b;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.flip-hint {
+  text-align: center;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 24px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.action-grid button {
+  padding: 10px 0;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+}
+
+.action-grid button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-review {
+  background: #f59e0b !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600;
+}
+
+.btn-master {
+  background: #10b981 !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #9ca3af;
+}
+</style>
